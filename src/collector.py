@@ -54,7 +54,7 @@ class Snapshot:
 # Collectors
 # -----------------------------------
 
-def get_cpu_utilization(interval: float = 1.0) -> List[float]:
+def get_cpu_utilization(interval: float = 1.0) -> CpuMetrics:
     """
     Get CPU utilization percentage for the sampling window.
 
