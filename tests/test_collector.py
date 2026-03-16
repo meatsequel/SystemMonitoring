@@ -1,12 +1,12 @@
 """
-Tests the src.collector.py functions
+Tests the collector.py functions
 All psutil calls are mocked
 """
 import datetime as dt
 
 import pytest
 import types
-from src.collector import CpuMetrics, MemoryMetrics, PartitionMetrics, DiskResult, Snapshot, get_cpu_utilization, get_virtual_memory, get_disks_statistics, get_snapshot
+from collector import CpuMetrics, MemoryMetrics, PartitionMetrics, DiskResult, Snapshot, get_cpu_utilization, get_virtual_memory, get_disks_statistics, get_snapshot
 
 # -----------------------------------
 # CPU Tests
@@ -16,7 +16,7 @@ def test_get_cpu_returns_correct_aggregate(monkeypatch):
     def mock_cpu_percent(interval, percpu):
         return [23.2, 1.6, 9.4, 9.4, 15.6, 7.7, 15.6, 6.2, 4.7, 0.0, 12.5, 6.2, 6.2, 6.2, 6.2, 10.9]
         
-    monkeypatch.setattr("src.collector.psutil.cpu_percent", mock_cpu_percent)
+    monkeypatch.setattr("collector.psutil.cpu_percent", mock_cpu_percent)
 
     result = get_cpu_utilization(interval=0.0)
 
@@ -28,7 +28,7 @@ def test_get_cpu_single_core(monkeypatch):
     def mock_cpu_percent(interval, percpu):
         return [23.2]
         
-    monkeypatch.setattr("src.collector.psutil.cpu_percent", mock_cpu_percent)
+    monkeypatch.setattr("collector.psutil.cpu_percent", mock_cpu_percent)
 
     result = get_cpu_utilization(interval=0.0)
 
@@ -40,7 +40,7 @@ def test_get_cpu_no_core(monkeypatch):
     def mock_cpu_percent(interval, percpu):
         return []
         
-    monkeypatch.setattr("src.collector.psutil.cpu_percent", mock_cpu_percent)
+    monkeypatch.setattr("collector.psutil.cpu_percent", mock_cpu_percent)
 
     result = get_cpu_utilization(interval=0.0)
     
@@ -56,7 +56,7 @@ def test_get_memory(monkeypatch):
     def mock_virtual_memory():
         return types.SimpleNamespace(total=34257379328, available=19424673792, percent=43.3, used=14832705536, free=19424673792)
     
-    monkeypatch.setattr("src.collector.psutil.virtual_memory", mock_virtual_memory)
+    monkeypatch.setattr("collector.psutil.virtual_memory", mock_virtual_memory)
 
     result = get_virtual_memory()
     
@@ -78,8 +78,8 @@ def test_get_disks_returns_correct_partition_data(monkeypatch):
     def mock_disk_usage(path):
         return types.SimpleNamespace(total=499158196224, used=384801402880, free=114356793344, percent=77.1)
     
-    monkeypatch.setattr("src.collector.psutil.disk_partitions", mock_disk_partitions)
-    monkeypatch.setattr("src.collector.psutil.disk_usage", mock_disk_usage)
+    monkeypatch.setattr("collector.psutil.disk_partitions", mock_disk_partitions)
+    monkeypatch.setattr("collector.psutil.disk_usage", mock_disk_usage)
 
     result = get_disks_statistics()
 
@@ -104,8 +104,8 @@ def test_get_disks_skips_non_mounted_partition(monkeypatch):
             raise OSError(f"[WinError 3] The system cannot find the path specified: {path}")
         return types.SimpleNamespace(total=499158196224, used=384801402880, free=114356793344, percent=77.1)
     
-    monkeypatch.setattr("src.collector.psutil.disk_partitions", mock_disk_partitions)
-    monkeypatch.setattr("src.collector.psutil.disk_usage", mock_disk_usage)
+    monkeypatch.setattr("collector.psutil.disk_partitions", mock_disk_partitions)
+    monkeypatch.setattr("collector.psutil.disk_usage", mock_disk_usage)
 
     result = get_disks_statistics()
 
@@ -124,8 +124,8 @@ def test_get_disks_all_non_mounted_partition(monkeypatch):
             raise OSError(f"[WinError 3] The system cannot find the path specified: {path}")
         return types.SimpleNamespace(total=499158196224, used=384801402880, free=114356793344, percent=77.1)
     
-    monkeypatch.setattr("src.collector.psutil.disk_partitions", mock_disk_partitions)
-    monkeypatch.setattr("src.collector.psutil.disk_usage", mock_disk_usage)
+    monkeypatch.setattr("collector.psutil.disk_partitions", mock_disk_partitions)
+    monkeypatch.setattr("collector.psutil.disk_usage", mock_disk_usage)
 
     result = get_disks_statistics()
 
@@ -142,8 +142,8 @@ def test_get_disks_skips_inaccessible_partition(monkeypatch):
             raise PermissionError(f"[Errno 13] Permission denied: {path}")
         return types.SimpleNamespace(total=499158196224, used=384801402880, free=114356793344, percent=77.1)
     
-    monkeypatch.setattr("src.collector.psutil.disk_partitions", mock_disk_partitions)
-    monkeypatch.setattr("src.collector.psutil.disk_usage", mock_disk_usage)
+    monkeypatch.setattr("collector.psutil.disk_partitions", mock_disk_partitions)
+    monkeypatch.setattr("collector.psutil.disk_usage", mock_disk_usage)
 
     result = get_disks_statistics()
 
@@ -163,8 +163,8 @@ def test_get_disks_all_inaccessible_partition(monkeypatch):
             raise PermissionError(f"[Errno 13] Permission denied: {path}")
         return types.SimpleNamespace(total=499158196224, used=384801402880, free=114356793344, percent=77.1)
     
-    monkeypatch.setattr("src.collector.psutil.disk_partitions", mock_disk_partitions)
-    monkeypatch.setattr("src.collector.psutil.disk_usage", mock_disk_usage)
+    monkeypatch.setattr("collector.psutil.disk_partitions", mock_disk_partitions)
+    monkeypatch.setattr("collector.psutil.disk_usage", mock_disk_usage)
 
     result = get_disks_statistics()
 
@@ -175,7 +175,7 @@ def test_get_disks_no_partitions(monkeypatch):
     def mock_disk_partitions():
         return []
     
-    monkeypatch.setattr("src.collector.psutil.disk_partitions", mock_disk_partitions)
+    monkeypatch.setattr("collector.psutil.disk_partitions", mock_disk_partitions)
 
     result = get_disks_statistics()
 
@@ -220,9 +220,9 @@ def test_get_snapshot(monkeypatch):
     def mock_get_virtual_memory():
         return mock_memory_metrics
 
-    monkeypatch.setattr("src.collector.get_disks_statistics", mock_get_disks_statistics)
-    monkeypatch.setattr("src.collector.get_cpu_utilization", mock_get_cpu_utilization)
-    monkeypatch.setattr("src.collector.get_virtual_memory", mock_get_virtual_memory)
+    monkeypatch.setattr("collector.get_disks_statistics", mock_get_disks_statistics)
+    monkeypatch.setattr("collector.get_cpu_utilization", mock_get_cpu_utilization)
+    monkeypatch.setattr("collector.get_virtual_memory", mock_get_virtual_memory)
 
     result = get_snapshot()
 
@@ -252,9 +252,9 @@ def test_get_snapshot_disk_error(monkeypatch):
     def mock_get_virtual_memory():
         return mock_memory_metrics
 
-    monkeypatch.setattr("src.collector.get_disks_statistics", mock_get_disks_statistics)
-    monkeypatch.setattr("src.collector.get_cpu_utilization", mock_get_cpu_utilization)
-    monkeypatch.setattr("src.collector.get_virtual_memory", mock_get_virtual_memory)
+    monkeypatch.setattr("collector.get_disks_statistics", mock_get_disks_statistics)
+    monkeypatch.setattr("collector.get_cpu_utilization", mock_get_cpu_utilization)
+    monkeypatch.setattr("collector.get_virtual_memory", mock_get_virtual_memory)
 
     result = get_snapshot()
 
