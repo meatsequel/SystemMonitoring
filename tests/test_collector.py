@@ -186,6 +186,21 @@ def test_get_disks_no_partitions(monkeypatch):
 # Snapshot Tests
 # -----------------------------------
 
+def make_mock_cpu():
+    return CpuMetrics(
+        aggregate_percent=8.85,
+        per_core_percent=[23.2, 1.6, 9.4, 9.4, 15.6, 7.7, 15.6, 6.2, 4.7, 0.0, 12.5, 6.2, 6.2, 6.2, 6.2, 10.9]
+    )
+
+def make_mock_memory():
+    return MemoryMetrics(
+        total_bytes=34257379328,
+        available_bytes=19424673792,
+        used_bytes=14832705536,
+        free_bytes=19424673792,
+        percent=43.3
+    )
+
 def test_get_snapshot(monkeypatch):
     mock_partitions = [PartitionMetrics(device='C:\\', mountpoint='C:\\', fstype='NTFS', total_bytes=499158196224, used_bytes=384851550208, free_bytes=114306646016, percent=77.1), 
                        PartitionMetrics(device='E:\\', mountpoint='E:\\', fstype='NTFS', total_bytes=1999323250688, used_bytes=1837896716288, free_bytes=161426534400, percent=91.9)] 
@@ -193,18 +208,9 @@ def test_get_snapshot(monkeypatch):
             partitions=mock_partitions,
             errors=[]
         ) 
-    mock_cpu_metrics = CpuMetrics(
-            aggregate_percent=8.85,
-            per_core_percent=[23.2, 1.6, 9.4, 9.4, 15.6, 7.7, 15.6, 6.2, 4.7, 0.0, 12.5, 6.2, 6.2, 6.2, 6.2, 10.9]
-        )
-    mock_memory_metrics = MemoryMetrics(
-            total_bytes=34257379328,
-            available_bytes=19424673792,
-            used_bytes=14832705536,
-            free_bytes=19424673792,
-            percent=43.3
-        )
-    
+    mock_cpu_metrics = make_mock_cpu()
+    mock_memory_metrics = make_mock_memory()
+
     def mock_get_disks_statistics():
         return mock_disk_result
 
@@ -227,3 +233,34 @@ def test_get_snapshot(monkeypatch):
     assert result.memory == mock_memory_metrics
     assert result.cpu == mock_cpu_metrics
 
+def test_get_snapshot_disk_error(monkeypatch):
+    mock_partitions = [PartitionMetrics(device='C:\\', mountpoint='C:\\', fstype='NTFS', total_bytes=499158196224, used_bytes=384851550208, free_bytes=114306646016, percent=77.1)] 
+    mock_errors = ["[WinError 3] The system cannot find the path specified: none"]
+    mock_disk_result = DiskResult(
+            partitions=mock_partitions,
+            errors=mock_errors
+        ) 
+    mock_cpu_metrics = make_mock_cpu()
+    mock_memory_metrics = make_mock_memory()
+    
+    def mock_get_disks_statistics():
+        return mock_disk_result
+
+    def mock_get_cpu_utilization(interval):
+        return mock_cpu_metrics
+
+    def mock_get_virtual_memory():
+        return mock_memory_metrics
+
+    monkeypatch.setattr("src.collector.get_disks_statistics", mock_get_disks_statistics)
+    monkeypatch.setattr("src.collector.get_cpu_utilization", mock_get_cpu_utilization)
+    monkeypatch.setattr("src.collector.get_virtual_memory", mock_get_virtual_memory)
+
+    result = get_snapshot()
+
+    assert isinstance(result, Snapshot)
+    assert isinstance(result.timestamp, dt.datetime)
+    assert result.disks == mock_partitions
+    assert result.errors == mock_errors
+    assert result.memory == mock_memory_metrics
+    assert result.cpu == mock_cpu_metrics
