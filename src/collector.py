@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import List, Tuple
+from typing import List
 from dataclasses import dataclass
 
 import psutil
