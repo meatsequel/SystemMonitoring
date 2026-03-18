@@ -53,6 +53,24 @@ def _format_bytes(num_bytes: int) -> str:
         return str(f"{_bytes_to_gb(num_bytes):.2f} GB")
     return str(f"{_bytes_to_mb(num_bytes):.2f} MB")
 
+def _get_color(percent: float) -> str:
+    """
+    Takes a percentage input and converts it to a rich color name
+
+    Args:
+        percent (float): Percent used / full
+
+    Returns:
+        str: A rich color name based on the percentage
+    """
+    if percent >= 90.0:
+        return "red"
+    if percent >= 75.0:
+        return "orange1"
+    if percent >= 60.0:
+        return "yellow"
+    return "green"
+
 # -----------------------------------
 # Display Class
 # -----------------------------------
@@ -86,7 +104,7 @@ class Display:
         Returns:
             Panel: The panel which has the updated table inside of it
         """
-        aggregate_text = Text(f"Total CPU Usage: {cpu_metric.aggregate_percent:.2f}%", justify="center")
+        aggregate_text = Text(f"Total CPU Usage: {cpu_metric.aggregate_percent:.2f}%", justify="center", style=_get_color(cpu_metric.aggregate_percent))
 
         cores = cpu_metric.per_core_percent
         chunk_size = 6
@@ -104,7 +122,7 @@ class Display:
             end_index = (i+1)*chunk_size
             # Add core pct to each chunk's respective table
             for t, core_pct in enumerate(cores[start_index:end_index], start=start_index):
-                cpu_table.add_row(str(t + 1), Group(f"{core_pct}%", ProgressBar(total=100, completed=core_pct, width=20)))
+                cpu_table.add_row(str(t + 1), Group(f"[{_get_color(core_pct)}]{str(core_pct)}%[/]", ProgressBar(total=100, completed=core_pct, width=20, complete_style=_get_color(core_pct))))
 
             tables.append(cpu_table)
 
@@ -139,7 +157,7 @@ class Display:
                           _format_bytes(memory_metric.available_bytes), 
                           _format_bytes(memory_metric.used_bytes), 
                           _format_bytes(memory_metric.free_bytes), 
-                          str(memory_metric.percent) + "%"
+                          f"[{_get_color(memory_metric.percent)}]{str(memory_metric.percent)}%[/]"
                           )
 
         panel = Panel(
@@ -176,7 +194,7 @@ class Display:
                                _format_bytes(disk.total_bytes),
                                _format_bytes(disk.used_bytes),
                                _format_bytes(disk.free_bytes),
-                               str(disk.percent) + "%"
+                               f"[{_get_color(disk.percent)}]{str(disk.percent)}%[/]"
                                )
 
         panel = Panel(
