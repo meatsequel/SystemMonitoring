@@ -181,12 +181,13 @@ class Display:
 
         return panel
     
-    def _update_disks_metrics(self, disks_metrics: List[PartitionMetrics]) -> Panel:
+    def _update_disks_metrics(self, disks_metrics: List[PartitionMetrics], errors: List[str]) -> Panel:
         """
         Updates the Disks Metrics tables
 
         Args:
             disks_metrics (List[PartitionMetrics]): The list of partition metrics for the disks received from the snapshot
+            errors (List[str]): The list of string erros for partition metrics that were omitted
 
         Returns:
             Panel: The panel which has the updated tables inside of it
@@ -207,9 +208,16 @@ class Display:
                                _format_bytes(disk.free_bytes),
                                f"[{_get_color(disk.percent)}]{disk.percent}%[/]"
                                )
+        
+        if errors:
+            error_strings = "\n".join(errors)
+            errors_text = Text(error_strings, justify="center", style="red")
+            render = Group(disk_table, errors_text)
+        else:
+            render = disk_table
 
         panel = Panel(
-            disk_table,
+            render,
             title="Disk Usage",
             border_style="bright_black",
             title_align="center",
@@ -230,7 +238,7 @@ class Display:
         """
         cpu_panel = self._update_cpu_metrics(snapshot.cpu)
         mem_panel = self._update_memory_metrics(snapshot.memory)
-        disk_panel = self._update_disks_metrics(snapshot.disks)
+        disk_panel = self._update_disks_metrics(snapshot.disks, snapshot.errors)
         
         self.layout['upper']['cpu'].update(cpu_panel)
         self.layout['upper']['memory'].update(mem_panel)
