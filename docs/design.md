@@ -39,6 +39,7 @@ Begin thinking how the logger file should look like, how it should be structured
     - I have mocked opening the file and trying to write it in cases where it should cause errors. I initially did it via changing the permission of the file but I thought it was too breakable. Switched to mocking builtins.open directly using unittest.mock.patch, I wasn't sure how os.chmod would perform on different os's.
     - Added multiple tests for the `__init__` function. First test function tries to give an invalid path to make sure an exception gets raised. The second test function checks what happens if the path given is a directory. The third test makes sure that it actually works with a valid path.
 
+
 Begin researching about `rich` library, how it is used and what I need. Began playing around with the rich library and its tables, layouts and panels.
 
 5. Begin writing `display.py` file
@@ -59,3 +60,29 @@ Begin researching about `rich` library, how it is used and what I need. Began pl
     - Used `rich`'s `Live` with `screen=True`. Set `refresh_per_second=4`, wasnt sure what value to pick here but 4 felt smooth enough without being excessive.
     - While testing I noticed the timing felt off, the loop was running slower than the interval I was passing in. Realized the issue was that `cpu_interval` already blocks for the duration of the measurement, so adding `time.sleep` on top of it meant the real cycle time was basically `cpu_interval + sleep`. Removed the sleep entirely.
     - Added a minimum interval check of `0.1` seconds. I tried passing `0` at some point and it just flooded the log file instantly, also psutil was returning the same cached values over and over since it had no time to actually measure anything. Used `parser.error()` to handle it since it shows the usage message and exits, cleaner than raising an exception myself.
+
+Begin thinking about what the report feature needs. The log file already has everything, just need to read it, filter by date and compute stats. Sketch out the dataclasses I need before writing anything.
+
+7. Begin writing `report.py` file
+    - Decided to start with the dataclasses before writing any logic. Created `MetricStats` to hold min, avg and max for a single metric. That way I dont have to repeat the same three fields inside every report dataclass.
+    - Created `CpuReport`, `MemoryReport`, `DiskReport`, `ThresholdBreach` and `Report` dataclasses. `Report` is the top level one that holds everything, thats what `get_report` will return.
+    - Began writing `_read_log`. First I tried reading the whole file at once with `readlines`, then thought about it and switched to reading line by line since the log file could get pretty big. Filters entries by checking if the timestamp starts with the given date. Wrapped the open in a try except for `OSError`, returns an error string the same way `log_snapshot` does.
+    - Wrote `_compute_stats`, takes a list of floats and computes min, max and avg. Pretty simple, just rounded everything to 2 decimal places.
+    - Began writing `get_report`. Started with CPU stats, pulled the aggregate percent out of each entry then did per core by looping over the core index. Memory was straightforward. Disks were more annoying since the same disk shows up across many entries, had to group them by mountpoint first using a dict before I could compute stats per disk.
+    - Wrote `_check_breaches`, loops over each metric and checks if the max hit the threshold. If no threshold was passed in for that metric it just skips it. Also realized I should check each CPU core individually and not just the aggregate, added that too.
+
+Begin thinking about how the report display should look. The live display needs a layout since its constantly refreshing, but the report just runs once and exits so I dont really need any of that. Just print each panel one after the other.
+
+8. Begin writing `report_display.py` file
+    - Decided to create a `ReportDisplay` class same as `Display`. Just has a `Console` instance in `__init__`, and then a separate render function for each section.
+    - Needed `_get_color` again here. Just copy pasted it from `display.py` as a module level function for now. Should probably move it to a shared utils file at some point to avoid the duplication.
+    - Created `_render_cpu`, table with Metric, Min %, Max % and Avg % columns. Initially I only had Min and Max but then added Avg too, felt weird to have stats without it.
+    - Created `_render_memory`, same structure as cpu. `_render_disks` took a bit more thought, needed device and mountpoint columns on top of the stats columns otherwise you wouldnt know which disk is which.
+    - Created `_render_breaches`. I wasnt sure how to make it visually obvious that something went wrong. Tried a few things and ended up just switching the panel border to red.
+    - Wrote `render_report`, prints each panel in order. Added an `if report.breaches` check before printing the breaches panel, dont want an empty red panel showing up when everything is fine.
+
+9. Updated `main.py` and `pyproject.toml`
+    - Needed to hook the report command into main. Switched to subparsers since you cant really do two commands cleanly without them, moved the monitor args moved into its own subparser.
+    - Wrote `run_report`, it calls `get_report` and then either prints the error string or hands the result to `ReportDisplay`.
+    - Added `--cpu-warn`, `--mem-warn` and `--disk-warn` to the report subparser. All optional, default to `None`. Wasnt sure if I should make them required but decided against it, the report is still useful without them.
+    - Added `[project.scripts]` to `pyproject.toml` so I dont have to type `python main.py` every time.
