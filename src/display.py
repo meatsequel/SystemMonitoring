@@ -1,13 +1,11 @@
 from typing import List
 
-from rich.columns import Columns
 from rich.text import Text
 from rich.console import Group
 from rich.table import Table
 from rich.panel import Panel
 from rich.layout import Layout
 from rich.progress_bar import ProgressBar
-import math
 
 from collector import CpuMetrics, MemoryMetrics, PartitionMetrics, Snapshot
 
@@ -50,8 +48,8 @@ def _format_bytes(num_bytes: int) -> str:
         str: The bytes converted to either MB or GB as a string
     """
     if num_bytes > 1024 * 1024 * 1024:
-        return str(f"{_bytes_to_gb(num_bytes):.2f} GB")
-    return str(f"{_bytes_to_mb(num_bytes):.2f} MB")
+        return f"{_bytes_to_gb(num_bytes):.2f} GB"
+    return f"{_bytes_to_mb(num_bytes):.2f} MB"
 
 def _get_color(percent: float) -> str:
     """
@@ -107,27 +105,40 @@ class Display:
         aggregate_text = Text(f"Total CPU Usage: {cpu_metric.aggregate_percent:.2f}%", justify="center", style=_get_color(cpu_metric.aggregate_percent))
 
         cores = cpu_metric.per_core_percent
-        chunk_size = 6
-        num_tables = math.ceil(len(cores) / chunk_size)
+        cores_per_row = 2
         
-        tables = []
-        
-        # Create a table for each chunk of cores
-        for i in range(num_tables):
-            cpu_table = Table(expand=True)
+        cpu_table = Table(expand=True)
+
+        # Add core and usage columns per group
+        for _ in range(cores_per_row):
             cpu_table.add_column("Core")
             cpu_table.add_column("Usage %")
-            
-            start_index = i*chunk_size
-            end_index = (i+1)*chunk_size
-            # Add core pct to each chunk's respective table
-            for t, core_pct in enumerate(cores[start_index:end_index], start=start_index):
-                cpu_table.add_row(str(t + 1), Group(f"[{_get_color(core_pct)}]{str(core_pct)}%[/]", ProgressBar(total=100, completed=core_pct, width=20, complete_style=_get_color(core_pct))))
 
-            tables.append(cpu_table)
+        remainder = len(cores) % cores_per_row
+        padded = list(cores)
+        if remainder:
+            padded += [None] * (cores_per_row - remainder)
+
+        num_rows = len(padded) // cores_per_row
+
+        for row_idx in range(num_rows):
+            row = []
+            for col in range(cores_per_row):
+                # Table gets filled top to bottom, left to right
+                core_pct = padded[row_idx + col * num_rows]
+                if core_pct is None:
+                    row.extend(["", ""])
+                else:
+                    row.extend([str(row_idx + col * num_rows + 1),
+                                Group(f"[{_get_color(core_pct)}]{core_pct}%[/]",
+                                      ProgressBar(total=100, completed=core_pct, width=20, complete_style=_get_color(core_pct))
+                                      )
+                                ])
+
+            cpu_table.add_row(*row)
 
         panel = Panel(
-            Group(aggregate_text, Columns(tables, equal=True)),
+            Group(aggregate_text, cpu_table),
             title="CPU Usage",
             border_style="bright_black",
             title_align="center",
@@ -157,7 +168,7 @@ class Display:
                           _format_bytes(memory_metric.available_bytes), 
                           _format_bytes(memory_metric.used_bytes), 
                           _format_bytes(memory_metric.free_bytes), 
-                          f"[{_get_color(memory_metric.percent)}]{str(memory_metric.percent)}%[/]"
+                          f"[{_get_color(memory_metric.percent)}]{memory_metric.percent}%[/]"
                           )
 
         panel = Panel(
@@ -194,7 +205,7 @@ class Display:
                                _format_bytes(disk.total_bytes),
                                _format_bytes(disk.used_bytes),
                                _format_bytes(disk.free_bytes),
-                               f"[{_get_color(disk.percent)}]{str(disk.percent)}%[/]"
+                               f"[{_get_color(disk.percent)}]{disk.percent}%[/]"
                                )
 
         panel = Panel(
