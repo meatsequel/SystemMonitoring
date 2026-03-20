@@ -1,6 +1,5 @@
 from rich.live import Live
 import argparse
-import datetime as dt
 
 import collector
 from display import Display
@@ -22,10 +21,11 @@ def run_monitor(interval: float, path: str) -> None:
     """
     log = Logger(path=path)
     disp = Display()
+    prev_network = None
 
     with Live(disp.layout, refresh_per_second=4, screen=True) as live:
         while True:
-            snapshot = collector.get_snapshot(cpu_interval=interval)
+            snapshot, prev_network = collector.get_snapshot(interval=interval, prev_network=prev_network)
             live.update(disp.update_display(snapshot=snapshot))
             log.log_snapshot(snapshot=snapshot)
 
@@ -65,24 +65,23 @@ def run_report(path: str, date: str, cpu_warn: float | None, mem_warn: float | N
 def main():
     parser = argparse.ArgumentParser(prog="sysmon")
     subparsers = parser.add_subparsers(dest="command")
- 
+
     monitor_parser = subparsers.add_parser("monitor", help="Run the live system monitor")
     monitor_parser.add_argument("--interval", help="Interval to monitor system at", type=float, default=2.0)
     monitor_parser.add_argument("--log", help="Path to log system readings to", type=str, default="log.jsonl")
- 
+
     report_parser = subparsers.add_parser("report", help="Generate a daily report from a log file")
     report_parser.add_argument("--date", help="Date to report on in YYYY-MM-DD format", type=str, required=True)
     report_parser.add_argument("--log", help="Path to the log file to read from", type=str, default="log.jsonl")
     report_parser.add_argument("--cpu-warn", help="CPU threshold percentage to check for breaches", type=float, default=None)
     report_parser.add_argument("--mem-warn", help="Memory threshold percentage to check for breaches", type=float, default=None)
     report_parser.add_argument("--disk-warn", help="Disk threshold percentage to check for breaches", type=float, default=None)
-    
+
     args = parser.parse_args()
 
     if args.command == "monitor":
         if args.interval < 0.1:
-            parser.error("--interval must be at least 0.1")
-
+            monitor_parser.error("--interval must be at least 0.1")
         try:
             run_monitor(args.interval, args.log)
         except KeyboardInterrupt:
@@ -95,6 +94,8 @@ def main():
             mem_warn=args.mem_warn,
             disk_warn=args.disk_warn
         )
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":

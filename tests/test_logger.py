@@ -6,7 +6,7 @@ import datetime as dt
 import pytest
 import json
 
-from collector import CpuMetrics, MemoryMetrics, PartitionMetrics, Snapshot
+from collector import CpuMetrics, MemoryMetrics, PartitionMetrics, Snapshot, NetworkMetrics
 from logger import Logger
 
 # -----------------------------------
@@ -25,7 +25,8 @@ def make_snapshot(disks=None):
         cpu=CpuMetrics(aggregate_percent=8.85, per_core_percent=[23.2, 1.6]),
         memory=MemoryMetrics(total_bytes=34257379328, available_bytes=19424673792, used_bytes=14832705536, free_bytes=19424673792, percent=43.3),
         disks=disks,
-        errors=[]
+        errors=[],
+        networks=[NetworkMetrics(interface="Ethernet", upload=141826714.54, download=390038572.01)]
     )
 
 # -----------------------------------
@@ -58,6 +59,8 @@ def test_snapshot_2_dict(tmp_path):
     assert result["memory"]["percent"] == 43.3
     assert len(result["disks"]) == 1
     assert len(result["errors"]) == 0
+    assert len(result["networks"]) == 1
+    assert result["networks"][0]["interface"] == "Ethernet"
 
 def test_snapshot_2_dict_no_disks(tmp_path):
     log = Logger(str(tmp_path / "test.jsonl"))
@@ -87,7 +90,6 @@ def test_log_2_file(tmp_path):
     assert parsed["timestamp"] == "2026-03-17 12:00:00"
     assert parsed["cpu"]["aggregate_percent"] == 8.85
     assert len(file_lines) == 1
-
 
 def test_log_2_file_error(tmp_path):
     log = Logger(str(tmp_path / "test.jsonl"))
@@ -139,7 +141,7 @@ def test_log_snapshot_double(tmp_path):
 
 def test_log_snapshot_error(tmp_path):
     log = Logger(str(tmp_path / "test.jsonl"))
-
+    
     # Mock the open file to raise an exception
     with patch("builtins.open") as mock_file:
         mock_file.side_effect = OSError()

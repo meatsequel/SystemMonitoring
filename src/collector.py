@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import List
+from typing import List, Tuple
 from dataclasses import dataclass
 
 import psutil
@@ -41,6 +41,13 @@ class DiskResult:
     errors: List[str]
 
 @dataclass
+class NetworkMetrics:
+    """Network speed for a single interface at a point in time"""
+    interface: str
+    upload: float
+    download: float
+
+@dataclass
 class Snapshot:
     """Complete system metric"""
     timestamp: dt.datetime
@@ -48,6 +55,7 @@ class Snapshot:
     memory: MemoryMetrics
     disks: List[PartitionMetrics]
     errors: List[str]
+    networks: List[NetworkMetrics]
 
 
 # -----------------------------------
@@ -114,27 +122,63 @@ def get_disks_statistics() -> DiskResult:
     
     return DiskResult(partitions=partitions, errors=errors)
 
+def get_network_statistics(prev_network: dict | None, interval: float) -> Tuple[List[NetworkMetrics], dict]:
+    """
+    Gets the network upload and download speed for each interface.
+    On the first call with no previous reading, returns empty speeds.
+
+    Args:
+        prev_network (dict | None): Raw network counters from the previous call, or None on first call
+        interval (float): Sampling window in seconds, used to calculate bytes per second
+
+    Returns:
+        Tuple of a list of NetworkMetrics for each interface and the current raw counters for the next call
+    """
+    curr_network = psutil.net_io_counters(pernic=True)
+
+    if not prev_network:
+        return [], curr_network
+
+    interfaces = []
+    for interface, stats in curr_network.items():
+        previous_stats = prev_network.get(interface, None)
+        if previous_stats:
+            dwn_spd = max(0, (stats.bytes_recv - previous_stats.bytes_recv) / interval)
+            up_speed = max(0, (stats.bytes_sent - previous_stats.bytes_sent) / interval)
+            interfaces.append(
+                NetworkMetrics(
+                    interface=interface,
+                    upload=up_speed,
+                    download=dwn_spd
+                )
+            )
+
+    return interfaces, curr_network
+
 # -----------------------------------
 # Snapshot
 # -----------------------------------
 
-def get_snapshot(cpu_interval: float = 1.0) -> Snapshot:
+def get_snapshot(interval: float = 1.0, prev_network: dict | None = None) -> Tuple[Snapshot, dict]:
     """
     Gets a snapshot of the current overall system statistics and usages.
 
     Args:
-        cpu_interval (float): Sampling window in seconds used for get_cpu().
+        interval (float): Sampling window in seconds used for get_cpu_utilization(), and to calculate the network speeds
+        prev_network (dict | None): Raw network counters from the previous snapshot, or None on first call
 
     Returns:
-        Snapshot with timestamp (UTC), cpu, memory, disk and errors all filled accordingly.
+        Tuple of the Snapshot with all metrics filled and the current raw network counters for the next call.
         Any partitions that had an error while trying to be read will be ommitted from disk.
         The reason for their error can be seen in Snapshot.errors
     """
     disk_result = get_disks_statistics()
+    network_speeds, curr_network = get_network_statistics(prev_network, interval)
     return Snapshot(
         timestamp=dt.datetime.now(dt.timezone.utc),
-        cpu=get_cpu_utilization(cpu_interval),
+        cpu=get_cpu_utilization(interval),
         memory=get_virtual_memory(),
         disks=disk_result.partitions,
         errors=disk_result.errors,
-    )
+        networks=network_speeds,
+    ), curr_network

@@ -6,7 +6,7 @@ import datetime as dt
 
 import pytest
 import types
-from collector import CpuMetrics, MemoryMetrics, PartitionMetrics, DiskResult, Snapshot, get_cpu_utilization, get_virtual_memory, get_disks_statistics, get_snapshot
+from collector import CpuMetrics, MemoryMetrics, PartitionMetrics, DiskResult, Snapshot, NetworkMetrics, get_cpu_utilization, get_virtual_memory, get_disks_statistics, get_snapshot
 
 # -----------------------------------
 # CPU Tests
@@ -152,7 +152,6 @@ def test_get_disks_skips_inaccessible_partition(monkeypatch):
     assert isinstance(result.partitions[0], PartitionMetrics)
     assert result.partitions[0].mountpoint == "E:\\"
 
-
 def test_get_disks_all_inaccessible_partition(monkeypatch):
     def mock_disk_partitions():
         return [types.SimpleNamespace(device='C:\\', mountpoint='admin', fstype='NTFS', opts='rw,fixed'), 
@@ -201,6 +200,12 @@ def make_mock_memory():
         percent=43.3
     )
 
+def make_mock_networks():
+    return [
+        NetworkMetrics(interface="Ethernet", upload=141826714.54, download=390038572.01),
+        NetworkMetrics(interface="Ethernet 2", upload=0, download=0),
+    ]
+
 def test_get_snapshot(monkeypatch):
     mock_partitions = [PartitionMetrics(device='C:\\', mountpoint='C:\\', fstype='NTFS', total_bytes=499158196224, used_bytes=384851550208, free_bytes=114306646016, percent=77.1), 
                        PartitionMetrics(device='E:\\', mountpoint='E:\\', fstype='NTFS', total_bytes=1999323250688, used_bytes=1837896716288, free_bytes=161426534400, percent=91.9)] 
@@ -210,6 +215,7 @@ def test_get_snapshot(monkeypatch):
         ) 
     mock_cpu_metrics = make_mock_cpu()
     mock_memory_metrics = make_mock_memory()
+    mock_network_metrics = make_mock_networks()
 
     def mock_get_disks_statistics():
         return mock_disk_result
@@ -220,11 +226,15 @@ def test_get_snapshot(monkeypatch):
     def mock_get_virtual_memory():
         return mock_memory_metrics
 
+    def mock_get_network_statistics(prev_network, interval):
+        return mock_network_metrics, {}
+
     monkeypatch.setattr("collector.get_disks_statistics", mock_get_disks_statistics)
     monkeypatch.setattr("collector.get_cpu_utilization", mock_get_cpu_utilization)
     monkeypatch.setattr("collector.get_virtual_memory", mock_get_virtual_memory)
+    monkeypatch.setattr("collector.get_network_statistics", mock_get_network_statistics)
 
-    result = get_snapshot()
+    result, _ = get_snapshot()
 
     assert isinstance(result, Snapshot)
     assert isinstance(result.timestamp, dt.datetime)
@@ -232,6 +242,7 @@ def test_get_snapshot(monkeypatch):
     assert result.errors == []
     assert result.memory == mock_memory_metrics
     assert result.cpu == mock_cpu_metrics
+    assert result.networks == mock_network_metrics
 
 def test_get_snapshot_disk_error(monkeypatch):
     mock_partitions = [PartitionMetrics(device='C:\\', mountpoint='C:\\', fstype='NTFS', total_bytes=499158196224, used_bytes=384851550208, free_bytes=114306646016, percent=77.1)] 
@@ -242,7 +253,7 @@ def test_get_snapshot_disk_error(monkeypatch):
         ) 
     mock_cpu_metrics = make_mock_cpu()
     mock_memory_metrics = make_mock_memory()
-    
+
     def mock_get_disks_statistics():
         return mock_disk_result
 
@@ -252,11 +263,15 @@ def test_get_snapshot_disk_error(monkeypatch):
     def mock_get_virtual_memory():
         return mock_memory_metrics
 
+    def mock_get_network_statistics(prev_network, interval):
+        return [], {}
+
     monkeypatch.setattr("collector.get_disks_statistics", mock_get_disks_statistics)
     monkeypatch.setattr("collector.get_cpu_utilization", mock_get_cpu_utilization)
     monkeypatch.setattr("collector.get_virtual_memory", mock_get_virtual_memory)
+    monkeypatch.setattr("collector.get_network_statistics", mock_get_network_statistics)
 
-    result = get_snapshot()
+    result, _ = get_snapshot()
 
     assert isinstance(result, Snapshot)
     assert isinstance(result.timestamp, dt.datetime)

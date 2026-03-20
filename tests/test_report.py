@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch
 from unittest import mock
 
-from report import CpuReport, MemoryReport, DiskReport, Report, MetricStats, _read_log, _compute_stats, _check_breaches, get_report
+from report import CpuReport, MemoryReport, DiskReport, Report, MetricStats, NetworkInterfaceReport, _read_log, _compute_stats, _check_breaches, get_report
 
 # -----------------------------------
 # Helper Functions
@@ -33,8 +33,8 @@ def make_disk_reports():
 
 def make_log_lines():
     return [
-        '{"timestamp": "2026-03-19 11:34:55", "cpu": {"aggregate_percent": 3.00625, "per_core_percent": [10.6, 0.0, 4.7, 4.6, 0.0, 0.0, 0.0, 1.6, 0.0, 3.1, 7.8, 1.6, 4.7, 0.0, 7.8, 1.6]}, "memory": {"total_bytes": 34257379328, "available_bytes": 19395764224, "used_bytes": 14861615104, "free_bytes": 19395764224, "percent": 43.4}, "disks": [{"device": "C:", "mountpoint": "C:", "fstype": "NTFS", "total_bytes": 499158196224, "used_bytes": 409774686208, "free_bytes": 89383510016, "percent": 82.1}, {"device": "D:", "mountpoint": "D:", "fstype": "NTFS", "total_bytes": 524283904, "used_bytes": 36532224, "free_bytes": 487751680, "percent": 7.0}, {"device": "E:", "mountpoint": "E:", "fstype": "NTFS", "total_bytes": 1999323250688, "used_bytes": 1837847474176, "free_bytes": 161475776512, "percent": 91.9}, {"device": "F:", "mountpoint": "F:", "fstype": "NTFS", "total_bytes": 1000186310656, "used_bytes": 342249750528, "free_bytes": 657936560128, "percent": 34.2}], "errors": []}',
-        '{"timestamp": "2026-03-19 11:34:57", "cpu": {"aggregate_percent": 2.1125000000000003, "per_core_percent": [7.5, 0.0, 1.5, 1.5, 0.0, 0.0, 0.0, 3.0, 3.1, 0.0, 6.2, 0.0, 1.6, 1.6, 6.2, 1.6]}, "memory": {"total_bytes": 34257379328, "available_bytes": 19387047936, "used_bytes": 14870331392, "free_bytes": 19387047936, "percent": 43.4}, "disks": [{"device": "C:", "mountpoint": "C:", "fstype": "NTFS", "total_bytes": 499158196224, "used_bytes": 409774694400, "free_bytes": 89383501824, "percent": 82.1}, {"device": "D:", "mountpoint": "D:", "fstype": "NTFS", "total_bytes": 524283904, "used_bytes": 36532224, "free_bytes": 487751680, "percent": 7.0}, {"device": "E:", "mountpoint": "E:", "fstype": "NTFS", "total_bytes": 1999323250688, "used_bytes": 1837847474176, "free_bytes": 161475776512, "percent": 91.9}, {"device": "F:", "mountpoint": "F:", "fstype": "NTFS", "total_bytes": 1000186310656, "used_bytes": 342249750528, "free_bytes": 657936560128, "percent": 34.2}], "errors": []}',
+        '{"timestamp": "2026-03-19 11:34:55", "cpu": {"aggregate_percent": 3.00625, "per_core_percent": [10.6, 0.0, 4.7, 4.6, 0.0, 0.0, 0.0, 1.6, 0.0, 3.1, 7.8, 1.6, 4.7, 0.0, 7.8, 1.6]}, "memory": {"total_bytes": 34257379328, "available_bytes": 19395764224, "used_bytes": 14861615104, "free_bytes": 19395764224, "percent": 43.4}, "disks": [{"device": "C:", "mountpoint": "C:", "fstype": "NTFS", "total_bytes": 499158196224, "used_bytes": 409774686208, "free_bytes": 89383510016, "percent": 82.1}, {"device": "D:", "mountpoint": "D:", "fstype": "NTFS", "total_bytes": 524283904, "used_bytes": 36532224, "free_bytes": 487751680, "percent": 7.0}, {"device": "E:", "mountpoint": "E:", "fstype": "NTFS", "total_bytes": 1999323250688, "used_bytes": 1837847474176, "free_bytes": 161475776512, "percent": 91.9}, {"device": "F:", "mountpoint": "F:", "fstype": "NTFS", "total_bytes": 1000186310656, "used_bytes": 342249750528, "free_bytes": 657936560128, "percent": 34.2}], "errors": [], "networks": [{"interface": "Ethernet", "upload": 141826714.54, "download": 390038572.01}, {"interface": "Ethernet 2", "upload": 0, "download": 0}]}',
+        '{"timestamp": "2026-03-19 11:34:57", "cpu": {"aggregate_percent": 2.1125000000000003, "per_core_percent": [7.5, 0.0, 1.5, 1.5, 0.0, 0.0, 0.0, 3.0, 3.1, 0.0, 6.2, 0.0, 1.6, 1.6, 6.2, 1.6]}, "memory": {"total_bytes": 34257379328, "available_bytes": 19387047936, "used_bytes": 14870331392, "free_bytes": 19387047936, "percent": 43.4}, "disks": [{"device": "C:", "mountpoint": "C:", "fstype": "NTFS", "total_bytes": 499158196224, "used_bytes": 409774694400, "free_bytes": 89383501824, "percent": 82.1}, {"device": "D:", "mountpoint": "D:", "fstype": "NTFS", "total_bytes": 524283904, "used_bytes": 36532224, "free_bytes": 487751680, "percent": 7.0}, {"device": "E:", "mountpoint": "E:", "fstype": "NTFS", "total_bytes": 1999323250688, "used_bytes": 1837847474176, "free_bytes": 161475776512, "percent": 91.9}, {"device": "F:", "mountpoint": "F:", "fstype": "NTFS", "total_bytes": 1000186310656, "used_bytes": 342249750528, "free_bytes": 657936560128, "percent": 34.2}], "errors": [], "networks": [{"interface": "Ethernet", "upload": 180976450.37, "download": 779009316.71}, {"interface": "Ethernet 2", "upload": 0, "download": 0}]}',
     ]
 
 # -----------------------------------
@@ -81,6 +81,13 @@ def test_compute_stats():
     assert result.max == 6.6
     assert result.avg == 3.85
 
+def test_compute_stats_empty():
+    result = _compute_stats([])
+
+    assert result.min == 0.0
+    assert result.avg == 0.0
+    assert result.max == 0.0
+
 # -----------------------------------
 # Check Breaches Tests
 # -----------------------------------
@@ -124,6 +131,10 @@ def test_get_report():
     assert len(result.disks) == 4
     assert result.disks[0].mountpoint == "C:"
     assert result.disks[0].percent.max == 82.1
+    assert len(result.networks) == 2
+    assert result.networks[0].interface == "Ethernet"
+    assert result.networks[0].upload.min == pytest.approx(141826714.54)
+    assert result.networks[0].upload.max == pytest.approx(180976450.37)
     assert result.breaches == []
 
 def test_get_report_with_breaches():

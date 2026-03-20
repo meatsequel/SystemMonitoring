@@ -32,6 +32,13 @@ class DiskReport:
     percent: MetricStats
 
 @dataclass
+class NetworkInterfaceReport:
+    """Network statistics for a single interface"""
+    interface: str
+    upload: MetricStats
+    download: MetricStats
+
+@dataclass
 class ThresholdBreach:
     """A single threshold breach entry"""
     metric: str
@@ -46,6 +53,7 @@ class Report:
     cpu: CpuReport
     memory: MemoryReport
     disks: List[DiskReport]
+    networks: List[NetworkInterfaceReport]
     breaches: List[ThresholdBreach]
 
 # -----------------------------------
@@ -114,7 +122,7 @@ def _check_breaches(cpu_report: CpuReport, memory_report: MemoryReport, disks_re
     Args:
         cpu_report (CpuReport): The computed CPU report
         memory_report (MemoryReport): The computed memory report
-        disks (List[DiskReport]): The computed disk reports
+        disks_reports (List[DiskReport]): The computed disk reports
         cpu_threshold (float | None): CPU threshold percentage or None to skip
         mem_threshold (float | None): Memory threshold percentage or None to skip
         disk_threshold (float | None): Disk threshold percentage or None to skip
@@ -184,7 +192,7 @@ def get_report(path: str, date: str, cpu_threshold: float | None = None, mem_thr
 
     if isinstance(log_entries, str):
         return log_entries
-    
+
     ## CPU Stats
     cpu_agg = [entry["cpu"]["aggregate_percent"] for entry in log_entries]
     cpu_aggregate_stats = _compute_stats(cpu_agg)
@@ -199,9 +207,7 @@ def get_report(path: str, date: str, cpu_threshold: float | None = None, mem_thr
 
     ## Memory Stats
     mem_pct = [entry["memory"]["percent"] for entry in log_entries]
-    mem_pct_stats = _compute_stats(mem_pct)
-
-    memory_report = MemoryReport(mem_pct_stats)
+    memory_report = MemoryReport(_compute_stats(mem_pct))
 
     ## Disk Stats
 
@@ -222,6 +228,28 @@ def get_report(path: str, date: str, cpu_threshold: float | None = None, mem_thr
             percent=_compute_stats(data["values"]),
         ))
 
+    ## Network Stats
+
+    # group speeds by interface
+    network_map = {}
+    for entry in log_entries:
+        if "networks" not in entry:
+            continue
+        for speed in entry["networks"]:
+            interface = speed["interface"]
+            if interface not in network_map:
+                network_map[interface] = {"upload": [], "download": []}
+            network_map[interface]["upload"].append(speed["upload"])
+            network_map[interface]["download"].append(speed["download"])
+
+    networks_reports = []
+    for interface, data in network_map.items():
+        networks_reports.append(NetworkInterfaceReport(
+            interface=interface,
+            upload=_compute_stats(data["upload"]),
+            download=_compute_stats(data["download"]),
+        ))
+
     breaches = _check_breaches(
         cpu_report=cpu_report,
         memory_report=memory_report,
@@ -237,5 +265,6 @@ def get_report(path: str, date: str, cpu_threshold: float | None = None, mem_thr
         cpu=cpu_report,
         memory=memory_report,
         disks=disks_reports,
+        networks=networks_reports,
         breaches=breaches,
     )

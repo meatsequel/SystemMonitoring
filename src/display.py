@@ -7,67 +7,8 @@ from rich.panel import Panel
 from rich.layout import Layout
 from rich.progress_bar import ProgressBar
 
-from collector import CpuMetrics, MemoryMetrics, PartitionMetrics, Snapshot
-
-# -----------------------------------
-# Helper Functions
-# -----------------------------------
-
-def _bytes_to_gb(num_bytes: int) -> float:
-    """
-    Method which takes bytes and converts it  to GB
-
-    Args:
-        num_bytes (int): The amount of bytes
-
-    Returns:
-        float: The bytes converted to GB
-    """
-    return num_bytes / 1024 / 1024 / 1024
-
-def _bytes_to_mb(num_bytes: int) -> float:
-    """
-    Method which takes bytes and converts it to MB
-
-    Args:
-        num_bytes (int): The amount of bytes
-
-    Returns:
-        float: The bytes converted to MB
-    """
-    return num_bytes / 1024 / 1024
-
-def _format_bytes(num_bytes: int) -> str:
-    """
-    Method which takes bytes and decides if to convert it to MB or GB
-
-    Args:
-        num_bytes (int): The amount of bytes
-
-    Returns:
-        str: The bytes converted to either MB or GB as a string
-    """
-    if num_bytes > 1024 * 1024 * 1024:
-        return f"{_bytes_to_gb(num_bytes):.2f} GB"
-    return f"{_bytes_to_mb(num_bytes):.2f} MB"
-
-def _get_color(percent: float) -> str:
-    """
-    Takes a percentage input and converts it to a rich color name
-
-    Args:
-        percent (float): Percent used / full
-
-    Returns:
-        str: A rich color name based on the percentage
-    """
-    if percent >= 90.0:
-        return "red"
-    if percent >= 75.0:
-        return "orange1"
-    if percent >= 60.0:
-        return "yellow"
-    return "green"
+from collector import CpuMetrics, MemoryMetrics, PartitionMetrics, Snapshot, NetworkMetrics
+from utils import get_color, format_bytes, format_speed
 
 # -----------------------------------
 # Display Class
@@ -91,6 +32,10 @@ class Display:
             Layout(name="cpu"),
             Layout(name="memory")
         )
+        self.layout['lower'].split_row(
+            Layout(name="disk"),
+            Layout(name="network")
+        )
     
     def _update_cpu_metrics(self, cpu_metric: CpuMetrics) -> Panel:
         """
@@ -102,7 +47,7 @@ class Display:
         Returns:
             Panel: The panel which has the updated table inside of it
         """
-        aggregate_text = Text(f"Total CPU Usage: {cpu_metric.aggregate_percent:.2f}%", justify="center", style=_get_color(cpu_metric.aggregate_percent))
+        aggregate_text = Text(f"Total CPU Usage: {cpu_metric.aggregate_percent:.2f}%", justify="center", style=get_color(cpu_metric.aggregate_percent))
 
         cores = cpu_metric.per_core_percent
         cores_per_row = 2
@@ -130,8 +75,8 @@ class Display:
                     row.extend(["", ""])
                 else:
                     row.extend([str(row_idx + col * num_rows + 1),
-                                Group(f"[{_get_color(core_pct)}]{core_pct}%[/]",
-                                      ProgressBar(total=100, completed=core_pct, width=20, complete_style=_get_color(core_pct))
+                                Group(f"[{get_color(core_pct)}]{core_pct}%[/]",
+                                      ProgressBar(total=100, completed=core_pct, width=20, complete_style=get_color(core_pct))
                                       )
                                 ])
 
@@ -164,11 +109,11 @@ class Display:
         mem_table.add_column("Free")
         mem_table.add_column("Usage %")
 
-        mem_table.add_row(_format_bytes(memory_metric.total_bytes), 
-                          _format_bytes(memory_metric.available_bytes), 
-                          _format_bytes(memory_metric.used_bytes), 
-                          _format_bytes(memory_metric.free_bytes), 
-                          f"[{_get_color(memory_metric.percent)}]{memory_metric.percent}%[/]"
+        mem_table.add_row(format_bytes(memory_metric.total_bytes), 
+                          format_bytes(memory_metric.available_bytes), 
+                          format_bytes(memory_metric.used_bytes), 
+                          format_bytes(memory_metric.free_bytes), 
+                          f"[{get_color(memory_metric.percent)}]{memory_metric.percent}%[/]"
                           )
 
         panel = Panel(
@@ -203,10 +148,10 @@ class Display:
 
         for disk in disks_metrics:
             disk_table.add_row(disk.device, disk.mountpoint, disk.fstype,
-                               _format_bytes(disk.total_bytes),
-                               _format_bytes(disk.used_bytes),
-                               _format_bytes(disk.free_bytes),
-                               f"[{_get_color(disk.percent)}]{disk.percent}%[/]"
+                               format_bytes(disk.total_bytes),
+                               format_bytes(disk.used_bytes),
+                               format_bytes(disk.free_bytes),
+                               f"[{get_color(disk.percent)}]{disk.percent}%[/]"
                                )
         
         if errors:
@@ -219,6 +164,35 @@ class Display:
         panel = Panel(
             render,
             title="Disk Usage",
+            border_style="bright_black",
+            title_align="center",
+            padding=(1, 2),
+        )
+
+        return panel
+    
+    def _update_network_metrics(self, interfaces: List[NetworkMetrics]) -> Panel:
+        """
+        Updates the Network Metrics table
+
+        Args:
+            interfaces (List[NetworkMetrics]): The list of network metrics for each interface received from the snapshot
+
+        Returns:
+            Panel: The panel which has the updated table inside of it
+        """
+        network_table = Table(expand=True)
+        network_table.add_column("Interface")
+        network_table.add_column("Upload Speed")
+        network_table.add_column("Download Speed")
+
+        for interface in interfaces:
+            if interface.interface:
+                network_table.add_row(interface.interface, format_speed(interface.upload), format_speed(interface.download))
+
+        panel = Panel(
+            network_table,
+            title="Network Usage",
             border_style="bright_black",
             title_align="center",
             padding=(1, 2),
@@ -239,9 +213,11 @@ class Display:
         cpu_panel = self._update_cpu_metrics(snapshot.cpu)
         mem_panel = self._update_memory_metrics(snapshot.memory)
         disk_panel = self._update_disks_metrics(snapshot.disks, snapshot.errors)
-        
+        network_panel = self._update_network_metrics(snapshot.networks)
+
         self.layout['upper']['cpu'].update(cpu_panel)
         self.layout['upper']['memory'].update(mem_panel)
-        self.layout['lower'].update(disk_panel)
+        self.layout['lower']['disk'].update(disk_panel)
+        self.layout['lower']['network'].update(network_panel)
 
         return self.layout
