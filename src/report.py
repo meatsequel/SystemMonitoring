@@ -93,6 +93,12 @@ def _compute_stats(values: List[float]) -> MetricStats:
     Returns:
         MetricStats with min, avg and max
     """
+    if not values:
+        return MetricStats(
+            min=0.0,
+            avg=0.0,
+            max=0.0
+        )
     return MetricStats(
         min=round(min(values), 2),
         avg=round(sum(values) / len(values), 2),
