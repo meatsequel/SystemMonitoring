@@ -18,3 +18,6 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.scripts]
+sysmon = "main:main"
