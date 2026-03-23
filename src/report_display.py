@@ -184,14 +184,14 @@ class ReportDisplay:
         """
         breaches_table = Table(expand=True)
         breaches_table.add_column("Metric")
-        breaches_table.add_column("Threshold %")
-        breaches_table.add_column("Max %")
+        breaches_table.add_column("Threshold")
+        breaches_table.add_column("Max")
 
         for breach in breaches:
             breaches_table.add_row(
                 breach.metric,
-                f"{breach.threshold}",
-                f"[red]{breach.max_percent}%[/]",
+                f"{breach.threshold} {breach.unit}",
+                f"[red]{breach.max_value} {breach.unit}[/]",
             )
 
         panel = Panel(

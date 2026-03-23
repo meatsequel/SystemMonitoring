@@ -31,6 +31,20 @@ def make_disk_reports():
         DiskReport(device="F:", mountpoint="F:", percent=MetricStats(min=34.2, avg=34.2, max=34.2)),
     ]
 
+def make_network_reports():
+    return [
+        NetworkInterfaceReport(
+            interface="Ethernet",
+            upload=MetricStats(min=141826714.54, avg=161401582.45, max=180976450.37),
+            download=MetricStats(min=390038572.01, avg=584523944.36, max=779009316.71),
+        ),
+        NetworkInterfaceReport(
+            interface="Ethernet 2",
+            upload=MetricStats(min=0.0, avg=0.0, max=0.0),
+            download=MetricStats(min=0.0, avg=0.0, max=0.0),
+        ),
+    ]
+
 def make_log_lines():
     return [
         '{"timestamp": "2026-03-19 11:34:55", "cpu": {"aggregate_percent": 3.00625, "per_core_percent": [10.6, 0.0, 4.7, 4.6, 0.0, 0.0, 0.0, 1.6, 0.0, 3.1, 7.8, 1.6, 4.7, 0.0, 7.8, 1.6]}, "memory": {"total_bytes": 34257379328, "available_bytes": 19395764224, "used_bytes": 14861615104, "free_bytes": 19395764224, "percent": 43.4}, "disks": [{"device": "C:", "mountpoint": "C:", "fstype": "NTFS", "total_bytes": 499158196224, "used_bytes": 409774686208, "free_bytes": 89383510016, "percent": 82.1}, {"device": "D:", "mountpoint": "D:", "fstype": "NTFS", "total_bytes": 524283904, "used_bytes": 36532224, "free_bytes": 487751680, "percent": 7.0}, {"device": "E:", "mountpoint": "E:", "fstype": "NTFS", "total_bytes": 1999323250688, "used_bytes": 1837847474176, "free_bytes": 161475776512, "percent": 91.9}, {"device": "F:", "mountpoint": "F:", "fstype": "NTFS", "total_bytes": 1000186310656, "used_bytes": 342249750528, "free_bytes": 657936560128, "percent": 34.2}], "errors": [], "networks": [{"interface": "Ethernet", "upload": 141826714.54, "download": 390038572.01}, {"interface": "Ethernet 2", "upload": 0, "download": 0}]}',
@@ -93,23 +107,36 @@ def test_compute_stats_empty():
 # -----------------------------------
 
 def test_check_breaches_no_thresholds():
-    breaches = _check_breaches(make_cpu_report(), make_memory_report(), make_disk_reports(),
-                               cpu_threshold=None, mem_threshold=None, disk_threshold=None)
+    breaches = _check_breaches(make_cpu_report(), make_memory_report(), make_disk_reports(), make_network_reports(),
+                               cpu_threshold=None, mem_threshold=None, disk_threshold=None,
+                               net_up_threshold=None, net_dwn_threshold=None)
 
     assert breaches == []
 
 def test_check_breaches_breach_detected():
-    breaches = _check_breaches(make_cpu_report(), make_memory_report(), make_disk_reports(),
-                               cpu_threshold=3.0, mem_threshold=43.0, disk_threshold=90.0)
+    breaches = _check_breaches(make_cpu_report(), make_memory_report(), make_disk_reports(), make_network_reports(),
+                               cpu_threshold=3.0, mem_threshold=43.0, disk_threshold=90.0,
+                               net_up_threshold=None, net_dwn_threshold=None)
 
     metrics = [b.metric for b in breaches]
     assert "CPU Aggregate" in metrics
     assert "Memory" in metrics
     assert "Disk E:" in metrics
 
+def test_check_breaches_network_breach():
+    breaches = _check_breaches(make_cpu_report(), make_memory_report(), make_disk_reports(), make_network_reports(),
+                               cpu_threshold=None, mem_threshold=None, disk_threshold=None,
+                               net_up_threshold=100.0, net_dwn_threshold=100.0)
+
+    metrics = [b.metric for b in breaches]
+    assert "Upload Ethernet" in metrics
+    assert "Download Ethernet" in metrics
+    assert breaches[0].unit == "Mbps"
+
 def test_check_breaches_no_breach():
-    breaches = _check_breaches(make_cpu_report(), make_memory_report(), make_disk_reports(),
-                               cpu_threshold=99.0, mem_threshold=99.0, disk_threshold=99.0)
+    breaches = _check_breaches(make_cpu_report(), make_memory_report(), make_disk_reports(), make_network_reports(),
+                               cpu_threshold=99.0, mem_threshold=99.0, disk_threshold=99.0,
+                               net_up_threshold=99999.0, net_dwn_threshold=99999.0)
 
     assert breaches == []
 
@@ -139,13 +166,16 @@ def test_get_report():
 
 def test_get_report_with_breaches():
     with patch("builtins.open", mock.mock_open(read_data="\n".join(make_log_lines()))):
-        result = get_report("test.jsonl", "2026-03-19", cpu_threshold=3.0, mem_threshold=43.0, disk_threshold=90.0)
+        result = get_report("test.jsonl", "2026-03-19", cpu_threshold=3.0, mem_threshold=43.0, disk_threshold=90.0,
+                            net_up_threshold=100.0, net_dwn_threshold=100.0)
 
     assert isinstance(result, Report)
     metrics = [b.metric for b in result.breaches]
     assert "CPU Aggregate" in metrics
     assert "Memory" in metrics
     assert "Disk E:" in metrics
+    assert "Upload Ethernet" in metrics
+    assert "Download Ethernet" in metrics
 
 def test_get_report_no_entries():
     lines = [make_log_lines()[0].replace("2026-03-19", "2026-03-18")]

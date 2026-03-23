@@ -33,7 +33,8 @@ def run_monitor(interval: float, path: str) -> None:
 # Report
 # -----------------------------------
 
-def run_report(path: str, date: str, cpu_warn: float | None, mem_warn: float | None, disk_warn: float | None):
+def run_report(path: str, date: str, cpu_warn: float | None, mem_warn: float | None, disk_warn: float | None,
+               net_up_warn: float | None, net_dwn_warn: float | None):
     """
     Main function called to generate daily report and to present it
 
@@ -43,6 +44,8 @@ def run_report(path: str, date: str, cpu_warn: float | None, mem_warn: float | N
         cpu_warn (float | None): CPU  threshold percentage to check for breaches
         mem_warn (float | None): Memory threshold percentage to check for breaches
         disk_warn (float | None): Disk threshold percentage to check for breaches
+        net_up_warn (float | None): Upload speed threshold in Mbps to check for breaches
+        net_dwn_warn (float | None): Download speed threshold in Mbps to check for breaches
     """
     result = get_report(
         path=path,
@@ -50,6 +53,8 @@ def run_report(path: str, date: str, cpu_warn: float | None, mem_warn: float | N
         cpu_threshold=cpu_warn,
         mem_threshold=mem_warn,
         disk_threshold=disk_warn,
+        net_up_threshold=net_up_warn,
+        net_dwn_threshold=net_dwn_warn,
     )
 
     if isinstance(result, str):
@@ -76,6 +81,8 @@ def main():
     report_parser.add_argument("--cpu-warn", help="CPU threshold percentage to check for breaches", type=float, default=None)
     report_parser.add_argument("--mem-warn", help="Memory threshold percentage to check for breaches", type=float, default=None)
     report_parser.add_argument("--disk-warn", help="Disk threshold percentage to check for breaches", type=float, default=None)
+    report_parser.add_argument("--net-up-warn", help="Upload speed threshold in Mbps to check for breaches", type=float, default=None)
+    report_parser.add_argument("--net-dwn-warn", help="Download speed threshold in Mbps to check for breaches", type=float, default=None)
 
     args = parser.parse_args()
 
@@ -92,7 +99,9 @@ def main():
             date=args.date,
             cpu_warn=args.cpu_warn,
             mem_warn=args.mem_warn,
-            disk_warn=args.disk_warn
+            disk_warn=args.disk_warn,
+            net_up_warn=args.net_up_warn,
+            net_dwn_warn=args.net_dwn_warn,
         )
     else:
         parser.print_help()
