@@ -1,35 +1,11 @@
 from typing import List
 
-from rich.text import Text
-from rich.console import Console, Group
+from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.layout import Layout
-from rich.progress_bar import ProgressBar
 
-from report import CpuReport, MemoryReport, DiskReport, ThresholdBreach, Report
-
-# -----------------------------------
-# Helper Functions
-# -----------------------------------
-
-def _get_color(percent: float) -> str:
-    """
-    Takes a percentage input and converts it to a rich color name
-
-    Args:
-        percent (float): Percent used / full
-
-    Returns:
-        str: A rich color name based on the percentage
-    """
-    if percent >= 90.0:
-        return "red"
-    if percent >= 75.0:
-        return "orange1"
-    if percent >= 60.0:
-        return "yellow"
-    return "green"
+from report import CpuReport, MemoryReport, DiskReport, ThresholdBreach, Report, NetworkInterfaceReport
+from utils import get_color, format_speed
 
 # -----------------------------------
 # ReportDisplay Class
@@ -42,10 +18,10 @@ class ReportDisplay:
     """
     def __init__(self) -> None:
         """
-        Initializes the Display module, and creates the layout for the display
+        Initializes the ReportDisplay with a rich Console
         """
         self.console = Console()
-    
+
     def _render_cpu(self, cpu_report: CpuReport) -> Panel:
         """
         Renders the CPU stats table
@@ -64,17 +40,17 @@ class ReportDisplay:
 
         cpu_table.add_row(
             "Aggregate",
-            f"[{_get_color(cpu_report.aggregate.min)}]{cpu_report.aggregate.min}%[/]",
-            f"[{_get_color(cpu_report.aggregate.max)}]{cpu_report.aggregate.max}%[/]",
-            f"[{_get_color(cpu_report.aggregate.avg)}]{cpu_report.aggregate.avg}%[/]",
+            f"[{get_color(cpu_report.aggregate.min)}]{cpu_report.aggregate.min}%[/]",
+            f"[{get_color(cpu_report.aggregate.max)}]{cpu_report.aggregate.max}%[/]",
+            f"[{get_color(cpu_report.aggregate.avg)}]{cpu_report.aggregate.avg}%[/]",
         )
 
         for i, core in enumerate(cpu_report.per_core):
             cpu_table.add_row(
                 f"Core {i+1}",
-                f"[{_get_color(core.min)}]{core.min}%[/]",
-                f"[{_get_color(core.max)}]{core.max}%[/]",
-                f"[{_get_color(core.avg)}]{core.avg}%[/]",
+                f"[{get_color(core.min)}]{core.min}%[/]",
+                f"[{get_color(core.max)}]{core.max}%[/]",
+                f"[{get_color(core.avg)}]{core.avg}%[/]",
             )
 
         panel = Panel(
@@ -86,7 +62,7 @@ class ReportDisplay:
         )
 
         return panel
-    
+
     def _render_memory(self, memory_report: MemoryReport) -> Panel:
         """
         Renders the memory stats table
@@ -105,9 +81,9 @@ class ReportDisplay:
 
         memory_table.add_row(
             "Memory",
-            f"[{_get_color(memory_report.percent.min)}]{memory_report.percent.min}%[/]",
-            f"[{_get_color(memory_report.percent.max)}]{memory_report.percent.max}%[/]",
-            f"[{_get_color(memory_report.percent.avg)}]{memory_report.percent.avg}%[/]",
+            f"[{get_color(memory_report.percent.min)}]{memory_report.percent.min}%[/]",
+            f"[{get_color(memory_report.percent.max)}]{memory_report.percent.max}%[/]",
+            f"[{get_color(memory_report.percent.avg)}]{memory_report.percent.avg}%[/]",
         )
 
         panel = Panel(
@@ -119,7 +95,7 @@ class ReportDisplay:
         )
 
         return panel
-    
+
     def _render_disks(self, disks: List[DiskReport]) -> Panel:
         """
         Renders the disks stats table
@@ -141,9 +117,9 @@ class ReportDisplay:
             disks_table.add_row(
                 disk.device,
                 disk.mountpoint,
-                f"[{_get_color(disk.percent.min)}]{disk.percent.min}%[/]",
-                f"[{_get_color(disk.percent.max)}]{disk.percent.max}%[/]",
-                f"[{_get_color(disk.percent.avg)}]{disk.percent.avg}%[/]",
+                f"[{get_color(disk.percent.min)}]{disk.percent.min}%[/]",
+                f"[{get_color(disk.percent.max)}]{disk.percent.max}%[/]",
+                f"[{get_color(disk.percent.avg)}]{disk.percent.avg}%[/]",
             )
 
         panel = Panel(
@@ -155,7 +131,47 @@ class ReportDisplay:
         )
 
         return panel
-    
+
+    def _render_networks(self, interfaces: List[NetworkInterfaceReport]) -> Panel:
+        """
+        Renders the network stats table
+
+        Args:
+            interfaces (List[NetworkInterfaceReport]): The computed network metrics from the report
+
+        Returns:
+            Panel: The panel which has the table inside of it
+        """
+        networks_table = Table(expand=True)
+        networks_table.add_column("Interface")
+        networks_table.add_column("Min Upload")
+        networks_table.add_column("Max Upload")
+        networks_table.add_column("Avg Upload")
+        networks_table.add_column("Min Download")
+        networks_table.add_column("Max Download")
+        networks_table.add_column("Avg Download")
+
+        for interface in interfaces:
+            networks_table.add_row(
+                interface.interface,
+                format_speed(interface.upload.min),
+                format_speed(interface.upload.max),
+                format_speed(interface.upload.avg),
+                format_speed(interface.download.min),
+                format_speed(interface.download.max),
+                format_speed(interface.download.avg),
+            )
+
+        panel = Panel(
+            networks_table,
+            title="Network Usage",
+            border_style="bright_black",
+            title_align="center",
+            padding=(1, 2),
+        )
+
+        return panel
+
     def _render_breaches(self, breaches: List[ThresholdBreach]) -> Panel:
         """
         Renders the threshold breaches table
@@ -168,14 +184,14 @@ class ReportDisplay:
         """
         breaches_table = Table(expand=True)
         breaches_table.add_column("Metric")
-        breaches_table.add_column("Threshold %")
-        breaches_table.add_column("Max %")
+        breaches_table.add_column("Threshold")
+        breaches_table.add_column("Max")
 
         for breach in breaches:
             breaches_table.add_row(
                 breach.metric,
-                f"{breach.threshold}",
-                f"[red]{breach.max_percent}%[/]",
+                f"{breach.threshold} {breach.unit}",
+                f"[red]{breach.max_value} {breach.unit}[/]",
             )
 
         panel = Panel(
@@ -199,6 +215,7 @@ class ReportDisplay:
         self.console.print(self._render_cpu(report.cpu))
         self.console.print(self._render_memory(report.memory))
         self.console.print(self._render_disks(report.disks))
+        self.console.print(self._render_networks(report.networks))
 
         if report.breaches:
             self.console.print(self._render_breaches(report.breaches))
